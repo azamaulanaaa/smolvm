@@ -1,0 +1,17 @@
+cpus = 1
+memory = 512
+net = true
+storage = 1
+overlay = 1
+image = "alpine"
+entrypoint = ["opencode"]
+
+[dev]
+env = []
+workdir = "/workspace"
+init = [
+  "apk add --no-cache curl bash git libstdc++ libgcc",
+  "curl -fsSL https://opencode.ai/install | bash",
+  "ln -sf /root/.opencode/bin/opencode /usr/local/bin/opencode",
+  "git config --global --add safe.directory /workspace",
+]
