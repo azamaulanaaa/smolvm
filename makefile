@@ -1,17 +1,25 @@
 # smolfile -> dist/* (single-file executable via smolvm)
-# Usage: make          # builds dist/pi (default)
-#        make opencode # builds dist/opencode from opencode.smolfile
-#        make clean    # removes dist/ + any leftover VM
-#        make help     # this help
+# Usage: make            # builds all dist/* (default)
+#        make pi         # builds dist/pi from pi.smolfile
+#        make base       # builds dist/base from base.smolfile
+#        make opencode   # builds dist/opencode from opencode.smolfile
+#        make SMOLS="pi base"   # build only a subset
+#        make clean      # removes dist/ + any leftover VMs
+#        make help       # this help
+#
+# Adding a new smolfile: just drop <name>.smolfile next to this
+# makefile — target <name> and output dist/<name> are generated
+# automatically by the SMOLVM_rule macro below. No edits needed.
 
 SHELL       := /bin/sh
 .SHELLFLAGS := -eu -c
 .DELETE_ON_ERROR:
 .NOTPARALLEL:
 
-VM       ?= pi
-SMOLFILE ?= pi.smolfile
-OUTPUT   ?= dist/pi
+# Every <name>.smolfile in this dir becomes a buildable target.
+# Override on the CLI to build a subset: make SMOLS="pi base"
+SMOLS ?= $(sort $(basename $(wildcard *.smolfile)))
+DIST  := $(addprefix dist/,$(SMOLS))
 
 # smolvm is NOT available in Alpine apk or npm registries.
 # It has no public distribution (no smolvm.io, no GitHub release).
@@ -20,13 +28,15 @@ OUTPUT   ?= dist/pi
 #   npm install -g opencode-ai  /  curl -fsSL https://opencode.ai/install | bash
 
 # default goal
-.DEFAULT_GOAL := pi
+.DEFAULT_GOAL := all
 
-.PHONY: pi all clean help check opencode
+.PHONY: all clean help check $(SMOLS)
 
-all: pi
+all: $(DIST)
 
-# verify tools + inputs before doing work
+# verify smolvm binary before doing work.
+# (Missing smolfiles are caught by make itself via the explicit
+# dist/<name>: <name>.smolfile prerequisite below.)
 check:
 	@command -v smolvm >/dev/null 2>&1 || { \
 		echo "error: smolvm not in PATH" >&2; \
@@ -41,61 +51,54 @@ check:
 		echo "  curl -fsSL https://opencode.ai/install | bash" >&2; \
 		exit 1; \
 	}
-	@test -f "$(SMOLFILE)" || { echo "error: $(SMOLFILE) not found" >&2; exit 1; }
 
-# rebuild when smolfile changes; output is the packed binary
-pi: check $(SMOLFILE)
-	@mkdir -p "$(dir $(OUTPUT))"
-	@echo "==> cleaning previous VM '$(VM)' (if any)..."
-	-smolvm machine rm --name "$(VM)" --force --cascade 2>/dev/null || true
-	@echo "==> creating VM '$(VM)' from $(SMOLFILE)..."
-	smolvm machine create --name "$(VM)" --smolfile "$(SMOLFILE)"
-	@echo "==> starting VM '$(VM)'..."
-	smolvm machine start --name "$(VM)"
-	@echo "==> stopping VM '$(VM)'..."
-	smolvm machine stop --name "$(VM)"
-	@echo "==> packing VM -> $(OUTPUT)..."
-	smolvm pack create --from-vm "$(VM)" --single-file --output "$(OUTPUT)"
-	@echo "==> removing build VM '$(VM)'..."
-	smolvm machine rm --name "$(VM)" --force --cascade
-	@echo "==> built $(OUTPUT) ($$(du -h "$(OUTPUT)" | cut -f1))"
+# -------------------------------------------------------------------
+# "Rust macro" for smolvm builds: $(call SMOLVM_rule,<name>) stamps out
+#   - a real file target  dist/<name>  (incremental: rebuilds only when
+#     <name>.smolfile changes)
+#   - a phony shorthand   <name>       (e.g. `make pi` == `make dist/pi`)
+# Add a new case by adding a new call — the foreach loop below already
+# calls it once per entry in $(SMOLS), so new *.smolfile files work
+# with zero makefile edits.
+# -------------------------------------------------------------------
+define SMOLVM_rule
+dist/$(1): $(1).smolfile | check
+	@mkdir -p "$$(dir $$@)"
+	@echo "==> cleaning previous VM '$(1)' (if any)..."
+	-smolvm machine rm --name "$(1)" --force --cascade 2>/dev/null || true
+	@echo "==> creating VM '$(1)' from $$<..."
+	smolvm machine create --name "$(1)" --smolfile "$$<"
+	@echo "==> starting VM '$(1)'..."
+	smolvm machine start --name "$(1)"
+	@echo "==> stopping VM '$(1)'..."
+	smolvm machine stop --name "$(1)"
+	@echo "==> packing VM -> $$@..."
+	smolvm pack create --from-vm "$(1)" --single-file --output "$$@"
+	@echo "==> removing build VM '$(1)'..."
+	smolvm machine rm --name "$(1)" --force --cascade
+	@echo "==> built $$@ ($$(du -h "$$@" | cut -f1))"
 
-# Build opencode single-file via smolvm (requires smolvm)
-opencode: VM := opencode
-opencode: SMOLFILE := opencode.smolfile
-opencode: OUTPUT := dist/opencode
-opencode: check $(SMOLFILE)
-	@mkdir -p "$(dir $(OUTPUT))"
-	@echo "==> cleaning previous VM '$(VM)' (if any)..."
-	-smolvm machine rm --name "$(VM)" --force --cascade 2>/dev/null || true
-	@echo "==> creating VM '$(VM)' from $(SMOLFILE)..."
-	smolvm machine create --name "$(VM)" --smolfile "$(SMOLFILE)"
-	@echo "==> starting VM '$(VM)'..."
-	smolvm machine start --name "$(VM)"
-	@echo "==> stopping VM '$(VM)'..."
-	smolvm machine stop --name "$(VM)"
-	@echo "==> packing VM -> $(OUTPUT)..."
-	smolvm pack create --from-vm "$(VM)" --single-file --output "$(OUTPUT)"
-	@echo "==> removing build VM '$(VM)'..."
-	smolvm machine rm --name "$(VM)" --force --cascade
-	@echo "==> built $(OUTPUT) ($$(du -h "$(OUTPUT)" | cut -f1))"
+.PHONY: $(1)
+$(1): dist/$(1)
+endef
+
+$(foreach s,$(SMOLS),$(eval $(call SMOLVM_rule,$(s))))
 
 clean:
 	@echo "==> cleaning..."
-	-smolvm machine rm --name "$(VM)" --force --cascade 2>/dev/null || true
-	-smolvm machine rm --name opencode --force --cascade 2>/dev/null || true
+	@for vm in $(SMOLS); do \
+		smolvm machine rm --name "$$vm" --force --cascade 2>/dev/null || true; \
+	done
 	rm -rf dist
-	rm -f "$(OUTPUT)"
 	@echo "==> clean done"
 
 help:
 	@printf '%s\n' "Targets:"
-	@printf '  %-12s %s\n' "pi (default)" "Build single-file binary 'dist/pi' from 'pi.smolfile' via smolvm"
-	@printf '  %-12s %s\n' "opencode" "Build single-file binary 'dist/opencode' from 'opencode.smolfile' via smolvm"
-	@printf '  %-12s %s\n' "all"          "Alias for pi"
-	@printf '  %-12s %s\n' "clean"        "Remove dist and any leftover VMs"
-	@printf '  %-12s %s\n' "help"         "Show this help"
+	@printf '  %-12s %s\n' "all (default)" "Build all: $(DIST)"
+	@for s in $(SMOLS); do \
+		printf '  %-12s Build single-file binary dist/%s from %s.smolfile via smolvm\n' "$$s" "$$s" "$$s"; \
+	done
+	@printf '  %-12s %s\n' "clean" "Remove dist and any leftover VMs ($(SMOLS))"
+	@printf '  %-12s %s\n' "help"  "Show this help"
 	@printf '\nVariables (override: make VAR=value):\n'
-	@printf '  %-12s %s\n' "VM"           "VM name (default: pi)"
-	@printf '  %-12s %s\n' "SMOLFILE"     "smolfile path (default: pi.smolfile)"
-	@printf '  %-12s %s\n' "OUTPUT"       "output binary (default: dist/pi)"
+	@printf '  %-12s %s\n' "SMOLS" "space-separated smol names (default: $(SMOLS))"
