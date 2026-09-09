@@ -1,0 +1,15 @@
+cpus = 1
+memory = 512
+net = true
+storage = 1
+overlay = 1 
+image = "alpine"
+entrypoint = ["bash"]
+
+[dev]
+workdir = "/workspace"
+init = [
+  "apk add --no-cache curl bash git",
+  "curl -fsSL https://mise.run/bash | sh",
+  "git config --global --add safe.directory /workspace",
+]
