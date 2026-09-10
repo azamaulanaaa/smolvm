@@ -7,6 +7,9 @@ image = "alpine"
 entrypoint = ["bash"]
 
 [dev]
+env = [
+  "MISE_ALL_COMPILE=false",
+]
 workdir = "/workspace"
 init = [
   "apk add --no-cache curl bash git",
