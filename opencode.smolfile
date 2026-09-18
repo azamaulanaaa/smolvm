@@ -7,13 +7,13 @@ storage = 1
 overlay = 1
 
 image = "alpine"
-entrypoint = ["bash", "-c"]
+entrypoint = ["/sbin/tini", "--"]
 cmd = ["opencode"]
 
 [dev]
 workdir = "/workspace"
 init = [
-  "apk add --no-cache curl bash git libstdc++ libgcc",
+  "apk add --no-cache tini curl bash git libstdc++ libgcc",
   "curl -fsSL https://opencode.ai/install | bash",
   "ln -sf /root/.opencode/bin/opencode /usr/local/bin/opencode",
   "git config --global --add safe.directory /workspace",
