@@ -7,6 +7,9 @@ storage = 1
 overlay = 1
 
 image = "alpine"
+env = [
+  "OPENCODE_ENABLE_EXA=1",
+]
 entrypoint = ["/sbin/tini", "--"]
 cmd = ["opencode"]
 
