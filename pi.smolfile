@@ -2,19 +2,20 @@ cpus = 1
 memory = 512
 net = true
 storage = 1
-overlay = 1 
-image = "node:alpine"
+overlay = 1
+image = "node:trixie-slim"
 entrypoint = ["pi"]
 
 [dev]
-env = [
-]
 workdir = "/workspace"
 init = [
-  "apk add --no-cache curl bash git fd ripgrep",
+  "apt-get update",
+  "DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y bash ca-certificates curl fd-find git ripgrep",
+  "ln -sf /usr/bin/fdfind /usr/local/bin/fd",
   "npm install -g --ignore-scripts @earendil-works/pi-coding-agent",
   "pi install npm:@ff-labs/pi-fff",
   "pi install npm:pi-web-access",
   "pi install npm:@juicesharp/rpiv-ask-user-question",
   "git config --global --add safe.directory /workspace",
+  "rm -rf /var/lib/apt/lists/*",
 ]

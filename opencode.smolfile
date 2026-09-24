@@ -6,18 +6,20 @@ net = true
 storage = 1
 overlay = 1
 
-image = "alpine"
+image = "debian:stable-slim"
 env = [
   "OPENCODE_ENABLE_EXA=1",
 ]
-entrypoint = ["/sbin/tini", "--"]
+entrypoint = ["/usr/bin/tini", "--"]
 cmd = ["opencode"]
 
 [dev]
 workdir = "/workspace"
 init = [
-  "apk add --no-cache tini curl bash git libstdc++ libgcc",
+  "apt-get update",
+  "DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y bash ca-certificates curl git libgcc-s1 libstdc++6 tini",
   "curl -fsSL https://opencode.ai/install | bash",
   "ln -sf /root/.opencode/bin/opencode /usr/local/bin/opencode",
   "git config --global --add safe.directory /workspace",
+  "rm -rf /var/lib/apt/lists/*",
 ]

@@ -1,4 +1,5 @@
-# smolfile -> dist/* (single-file executable via smolvm)
+# Optional build helper: *.smolfile -> dist/* (single-file launchers via smolvm)
+# This file is not required to edit, review, or use the checked-in Smolfiles.
 # Usage: make            # builds all dist/* (default)
 #        make pi         # builds dist/pi from pi.smolfile
 #        make base       # builds dist/base from base.smolfile
@@ -21,11 +22,9 @@ SHELL       := /bin/sh
 SMOLS ?= $(sort $(basename $(wildcard *.smolfile)))
 DIST  := $(addprefix dist/,$(SMOLS))
 
-# smolvm is NOT available in Alpine apk or npm registries.
-# It has no public distribution (no smolvm.io, no GitHub release).
-# The existing dist/pi was pre-built elsewhere. To rebuild locally you
-# must obtain smolvm binary manually, or install opencode directly:
-#   npm install -g opencode-ai  /  curl -fsSL https://opencode.ai/install | bash
+# smolvm is an external host runtime and is not vendored by this repository.
+# See README.md and https://smolmachines.com/docs/local for installation and
+# host requirements. Generated dist/ files are ignored and are not checked in.
 
 # default goal
 .DEFAULT_GOAL := all
@@ -41,14 +40,10 @@ check:
 	@command -v smolvm >/dev/null 2>&1 || { \
 		echo "error: smolvm not in PATH" >&2; \
 		echo "" >&2; \
-		echo "Research: smolvm has no public install (apk search finds nothing," >&2; \
-		echo "smolvm.io NXDOMAIN, github.com/smolvm 404, npm has no smolvm)." >&2; \
-		echo "The checked-in dist/pi is a pre-built artifact; you cannot rebuild" >&2; \
-		echo "smolfiles without a smolvm binary." >&2; \
-		echo "" >&2; \
-		echo "Without smolvm, install directly:" >&2; \
-		echo "  npm install -g opencode-ai" >&2; \
-		echo "  curl -fsSL https://opencode.ai/install | bash" >&2; \
+		echo "smolvm is required only for running or packing these Smolfiles." >&2; \
+		echo "Install it with:" >&2; \
+		echo "  curl -fsSL https://smolmachines.com/install.sh | bash" >&2; \
+		echo "See https://smolmachines.com/docs/local for host requirements." >&2; \
 		exit 1; \
 	}
 
@@ -65,7 +60,7 @@ define SMOLVM_rule
 dist/$(1): $(1).smolfile | check
 	@mkdir -p "$$(dir $$@)"
 	@echo "==> cleaning previous VM '$(1)' (if any)..."
-	-smolvm machine rm --name "$(1)" --force --cascade 2>/dev/null || true
+	-smolvm machine delete --name "$(1)" --force --cascade 2>/dev/null || true
 	@echo "==> creating VM '$(1)' from $$<..."
 	smolvm machine create --name "$(1)" --smolfile "$$<"
 	@echo "==> starting VM '$(1)'..."
@@ -75,8 +70,8 @@ dist/$(1): $(1).smolfile | check
 	@echo "==> packing VM -> $$@..."
 	smolvm pack create --from-vm "$(1)" --single-file --output "$$@"
 	@echo "==> removing build VM '$(1)'..."
-	smolvm machine rm --name "$(1)" --force --cascade
-	@echo "==> built $$@ ($$(du -h "$$@" | cut -f1))"
+	smolvm machine delete --name "$(1)" --force --cascade
+	@echo "==> built $$@ ($$(du -sh "$$@"))"
 
 .PHONY: $(1)
 $(1): dist/$(1)
@@ -87,7 +82,7 @@ $(foreach s,$(SMOLS),$(eval $(call SMOLVM_rule,$(s))))
 clean:
 	@echo "==> cleaning..."
 	@for vm in $(SMOLS); do \
-		smolvm machine rm --name "$$vm" --force --cascade 2>/dev/null || true; \
+		smolvm machine delete --name "$$vm" --force --cascade 2>/dev/null || true; \
 	done
 	rm -rf dist
 	@echo "==> clean done"

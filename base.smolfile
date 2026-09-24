@@ -2,8 +2,8 @@ cpus = 1
 memory = 512
 net = true
 storage = 1
-overlay = 1 
-image = "alpine"
+overlay = 1
+image = "debian:stable-slim"
 entrypoint = ["bash"]
 
 [dev]
@@ -12,7 +12,10 @@ env = [
 ]
 workdir = "/workspace"
 init = [
-  "apk add --no-cache curl bash git",
-  "curl -fsSL https://mise.run/bash | sh",
+  "apt-get update",
+  "DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y bash ca-certificates curl git",
+  "curl -fsSL https://mise.run | sh",
+  "ln -sf /root/.local/bin/mise /usr/local/bin/mise",
   "git config --global --add safe.directory /workspace",
+  "rm -rf /var/lib/apt/lists/*",
 ]
