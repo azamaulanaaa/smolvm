@@ -18,7 +18,7 @@ workdir = "/workspace"
 init = [
   "apt-get update",
   "DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y bash ca-certificates curl git libgcc-s1 libstdc++6 tini",
-  "curl -fsSL https://opencode.ai/install | bash",
+  "curl -fsSL https://opencode.ai/v2/install | bash",
   "ln -sf /root/.opencode/bin/opencode /usr/local/bin/opencode",
   "git config --global --add safe.directory /workspace",
   "rm -rf /var/lib/apt/lists/*",
