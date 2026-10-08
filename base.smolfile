@@ -16,6 +16,7 @@ init = [
   "DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y bash ca-certificates curl git",
   "curl -fsSL https://mise.run | sh",
   "ln -sf /root/.local/bin/mise /usr/local/bin/mise",
+  "activation='eval \"$(mise activate bash)\"' && grep -qxF \"$activation\" ~/.bashrc 2>/dev/null || printf '%s\\n' \"$activation\" >> ~/.bashrc",
   "git config --global --add safe.directory /workspace",
   "rm -rf /var/lib/apt/lists/*",
 ]
